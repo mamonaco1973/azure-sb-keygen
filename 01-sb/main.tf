@@ -24,7 +24,7 @@ data "azurerm_client_config" "current" {}
 variable "resource_group_name" {
   description = "The name of the Azure resource group"
   type        = string
-  default     = "mcloud-project-rg"
+  default     = "sb-keygen-rg"
 }
 
 variable "resource_group_location" {
@@ -34,7 +34,7 @@ variable "resource_group_location" {
 }
 
 # Define a resource group for all resources
-resource "azurerm_resource_group" "ad" {
+resource "azurerm_resource_group" "project_rg" {
   name     = var.resource_group_name     # Name of the resource group from variable
   location = var.resource_group_location # Location from variable
 }
