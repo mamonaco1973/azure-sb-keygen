@@ -128,18 +128,18 @@ resource "azurerm_linux_function_app" "keygen_func" {
 
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.func_ai.connection_string
 
-    # ----------------------------
-    # Service Bus (SAS for now)
-    # ----------------------------
-    SERVICEBUS_QUEUE_NAME = azurerm_servicebus_queue.keygen_queue.name
+  # ----------------------------
+  # Service Bus (RBAC)
+  # ----------------------------
+  SERVICEBUS_QUEUE_NAME     = azurerm_servicebus_queue.keygen_queue.name
+  SERVICEBUS_NAMESPACE_FQDN = "${azurerm_servicebus_namespace.keygen.name}.servicebus.windows.net"
 
-    # ----------------------------
-    # Cosmos DB (primary key for now)
-    # ----------------------------
-    COSMOS_ENDPOINT       = azurerm_cosmosdb_account.keygen.endpoint
-    COSMOS_KEY            = azurerm_cosmosdb_account.keygen.primary_key
-    COSMOS_DATABASE_NAME  = azurerm_cosmosdb_sql_database.keygen.name
-    COSMOS_CONTAINER_NAME = azurerm_cosmosdb_sql_container.results.name
+  # ----------------------------
+  # Cosmos DB (RBAC)
+  # ----------------------------
+  COSMOS_ENDPOINT       = azurerm_cosmosdb_account.keygen.endpoint
+  COSMOS_DATABASE_NAME  = azurerm_cosmosdb_sql_database.keygen.name
+  COSMOS_CONTAINER_NAME = azurerm_cosmosdb_sql_container.results.name
   }
 
   lifecycle {
