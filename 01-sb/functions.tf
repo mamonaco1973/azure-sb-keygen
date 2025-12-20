@@ -142,6 +142,16 @@ resource "azurerm_linux_function_app" "keygen_func" {
     COSMOS_DATABASE_NAME  = azurerm_cosmosdb_sql_database.keygen.name
     COSMOS_CONTAINER_NAME = azurerm_cosmosdb_sql_container.results.name
   }
+
+  lifecycle {
+  ignore_changes = [
+    app_settings["APPLICATIONINSIGHTS_CONNECTION_STRING"],
+    app_settings["FUNCTIONS_EXTENSION_VERSION"],
+    app_settings["SCM_DO_BUILD_DURING_DEPLOYMENT"],
+    site_config[0].application_insights_connection_string
+  ]
+  }
+
 }
 
 # ------------------------------------------------------------------------------------------------
