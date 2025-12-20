@@ -139,7 +139,11 @@ resource "azurerm_cosmosdb_sql_role_definition" "keygen_cosmos_role" {
 }
 
 resource "azurerm_cosmosdb_sql_role_assignment" "keygen_cosmos_role_assignment" {
-  name                = uuid()
+  name = uuidv5(
+  "dns",
+  "${azurerm_cosmosdb_account.keygen.id}:${azurerm_linux_function_app.keygen_func.identity[0].principal_id}:${azurerm_cosmosdb_sql_role_definition.keygen_cosmos_role.id}"
+  )
+   
   resource_group_name = azurerm_resource_group.project_rg.name
   account_name        = azurerm_cosmosdb_account.keygen.name
 
