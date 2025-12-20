@@ -126,16 +126,13 @@ resource "azurerm_linux_function_app" "keygen_func" {
     FUNCTIONS_EXTENSION_VERSION = "~4"
     FUNCTIONS_WORKER_RUNTIME    = "python"
 
-    APPLICATIONINSIGHTS_CONNECTION_STRING =
-      azurerm_application_insights.func_ai.connection_string
+    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.func_ai.connection_string
 
     # ----------------------------
     # Service Bus (SAS for now)
     # ----------------------------
     SERVICEBUS_QUEUE_NAME = azurerm_servicebus_queue.keygen_queue.name
-    SERVICEBUS_CONN_STR   =
-      azurerm_servicebus_queue_authorization_rule.keygen_sas
-        .primary_connection_string
+    SERVICEBUS_CONN_STR   = azurerm_servicebus_queue_authorization_rule.keygen_sas.primary_connection_string
 
     # ----------------------------
     # Cosmos DB (primary key for now)
@@ -144,10 +141,6 @@ resource "azurerm_linux_function_app" "keygen_func" {
     COSMOS_KEY            = azurerm_cosmosdb_account.keygen.primary_key
     COSMOS_DATABASE_NAME  = azurerm_cosmosdb_sql_database.keygen.name
     COSMOS_CONTAINER_NAME = azurerm_cosmosdb_sql_container.results.name
-  }
-
-  tags = {
-    project = "sb-keygen"
   }
 }
 
