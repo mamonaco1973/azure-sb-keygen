@@ -69,3 +69,8 @@ zip -r app.zip . \
 
 cd ..
 
+# Get the Function App name
+FunctionAppName=$(az functionapp list --resource-group sb-keygen-rg --query "[?starts_with(name, 'func-keygen-')].name" --output tsv)
+
+# Publish the latest code using the AZ CLI
+az functionapp deployment source config-zip --name "$FunctionAppName" --resource-group sb-keygen-rg --src app.zip --build-remote true
