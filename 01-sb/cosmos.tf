@@ -117,31 +117,39 @@ resource "azurerm_cosmosdb_sql_container" "results" {
   }
 }
 
-# ------------------------------------------------------------------------------------------------
-# Outputs
-# ------------------------------------------------------------------------------------------------
-# output "cosmos_account_name" {
-#   description = "Cosmos DB account name."
-#   value       = azurerm_cosmosdb_account.keygen.name
-# }
+# ================================================================================================
+# Cosmos DB SQL RBAC
+# ================================================================================================
+# - Defines a custom Cosmos DB SQL API role for the keygen function.
+# - Assigns the role to the Function App's system-assigned managed identity.
+# ================================================================================================
 
-# output "cosmos_sql_database_name" {
-#   description = "Cosmos DB SQL database name."
-#   value       = azurerm_cosmosdb_sql_database.keygen.name
-# }
+resource "azurerm_cosmosdb_sql_role_definition" "keygen_cosmos_role" {
+  name                = "KeygenCosmosRole"
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.cosmos.name
 
-# output "cosmos_sql_container_name" {
-#   description = "Cosmos DB SQL container name."
-#   value       = azurerm_cosmosdb_sql_container.results.name
-# }
+  type              = "CustomRole"
+  assignable_scopes = [azurerm_cosmosdb_account.cosmos.id]
 
-# output "cosmos_primary_key" {
-#   description = "Cosmos DB primary key (local dev only)."
-#   value       = azurerm_cosmosdb_account.keygen.primary_key
-#   sensitive   = true
-# }
+  permissions {
+    data_actions = [
+      # Read account/container metadata (common requirement for SDK operations)
+      "Microsoft.DocumentDB/databaseAccounts/readMetadata",
 
-# output "cosmos_endpoint" {
-#   description = "Cosmos DB account endpoint."
-#   value       = azurerm_cosmosdb_account.keygen.endpoint
-# }
+      # Container + item access for SQL API
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*",
+      "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*",
+    ]
+  }
+}
+
+resource "azurerm_cosmosdb_sql_role_assignment" "keygen_cosmos_role_assignment" {
+  name                = uuid()
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.cosmos.name
+
+  principal_id       = azurerm_linux_function_app.keygen_func.identity[0].principal_id
+  role_definition_id = azurerm_cosmosdb_sql_role_definition.keygen_cosmos_role.id
+  scope              = azurerm_cosmosdb_account.cosmos.id
+}

@@ -70,3 +70,17 @@ resource "azurerm_servicebus_queue" "keygen_queue" {
   requires_duplicate_detection = false
   requires_session             = false
 }
+
+
+resource "azurerm_role_assignment" "sb_sender" {
+  scope                = azurerm_servicebus_queue.keygen_queue.id
+  role_definition_name = "Azure Service Bus Data Sender"
+  principal_id         = azurerm_linux_function_app.keygen_func.identity[0].principal_id
+}
+
+resource "azurerm_role_assignment" "sb_receiver" {
+  scope                = azurerm_servicebus_queue.keygen_queue.id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = azurerm_linux_function_app.keygen_func.identity[0].principal_id
+}
+
