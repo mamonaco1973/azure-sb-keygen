@@ -40,27 +40,27 @@ resource "random_string" "sa_suffix" {
 # Locals
 # ------------------------------------------------------------------------------------------------
 locals {
-  func_app_name  = "func-keygen-${random_string.func_suffix.result}"
-  plan_name      = "plan-keygen-${random_string.func_suffix.result}"
+  func_app_name = "func-keygen-${random_string.func_suffix.result}"
+  plan_name     = "plan-keygen-${random_string.func_suffix.result}"
 
   # Storage account names must be 3-24 chars, lowercase letters + numbers only.
-  storage_name   = "sakeygen${random_string.sa_suffix.result}"
+  storage_name = "sakeygen${random_string.sa_suffix.result}"
 
-  ai_name        = "ai-keygen-${random_string.func_suffix.result}"
+  ai_name = "ai-keygen-${random_string.func_suffix.result}"
 }
 
 # ------------------------------------------------------------------------------------------------
 # Storage account (Functions requirement)
 # ------------------------------------------------------------------------------------------------
 resource "azurerm_storage_account" "func_sa" {
-  name                     = local.storage_name
-  resource_group_name      = azurerm_resource_group.project_rg.name
-  location                 = azurerm_resource_group.project_rg.location
+  name                = local.storage_name
+  resource_group_name = azurerm_resource_group.project_rg.name
+  location            = azurerm_resource_group.project_rg.location
 
   account_tier             = "Standard"
   account_replication_type = "LRS"
 
-  min_tls_version          = "TLS1_2"
+  min_tls_version = "TLS1_2"
 
   tags = {
     project = "sb-keygen"
@@ -76,7 +76,7 @@ resource "azurerm_service_plan" "func_plan" {
   location            = azurerm_resource_group.project_rg.location
 
   os_type  = "Linux"
-  sku_name = "Y1"   # Consumption
+  sku_name = "Y1" # Consumption
 }
 
 # ------------------------------------------------------------------------------------------------
@@ -132,7 +132,6 @@ resource "azurerm_linux_function_app" "keygen_func" {
     # Service Bus (SAS for now)
     # ----------------------------
     SERVICEBUS_QUEUE_NAME = azurerm_servicebus_queue.keygen_queue.name
-    SERVICEBUS_CONN_STR   = azurerm_servicebus_queue_authorization_rule.keygen_sas.primary_connection_string
 
     # ----------------------------
     # Cosmos DB (primary key for now)
@@ -144,30 +143,11 @@ resource "azurerm_linux_function_app" "keygen_func" {
   }
 
   lifecycle {
-  ignore_changes = [
-    app_settings["APPLICATIONINSIGHTS_CONNECTION_STRING"],
-    app_settings["FUNCTIONS_EXTENSION_VERSION"],
-    app_settings["SCM_DO_BUILD_DURING_DEPLOYMENT"],
-    site_config[0].application_insights_connection_string
-  ]
+    ignore_changes = [
+      app_settings["APPLICATIONINSIGHTS_CONNECTION_STRING"],
+      app_settings["FUNCTIONS_EXTENSION_VERSION"],
+      app_settings["SCM_DO_BUILD_DURING_DEPLOYMENT"],
+      site_config[0].application_insights_connection_string
+    ]
   }
-
 }
-
-# ------------------------------------------------------------------------------------------------
-# Outputs
-# ------------------------------------------------------------------------------------------------
-# output "function_app_name" {
-#   description = "Function App name."
-#   value       = azurerm_linux_function_app.keygen_func.name
-# }
-
-# output "function_app_default_hostname" {
-#   description = "Function App default hostname."
-#   value       = azurerm_linux_function_app.keygen_func.default_hostname
-# }
-
-# output "function_app_identity_principal_id" {
-#   description = "System-assigned managed identity principal id."
-#   value       = azurerm_linux_function_app.keygen_func.identity[0].principal_id
-# }

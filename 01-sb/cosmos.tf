@@ -92,7 +92,7 @@ resource "azurerm_cosmosdb_sql_container" "results" {
   #   - -1  = disabled
   #   - > 0 = automatic deletion after N seconds
   # ----------------------------------------------------------------------------------------------
-  default_ttl = 3600  # 1 hour
+  default_ttl = 3600 # 1 hour
 
   indexing_policy {
     indexing_mode = "consistent"
@@ -106,7 +106,7 @@ resource "azurerm_cosmosdb_sql_container" "results" {
     }
   }
 
-  
+
   # ----------------------------------------------------------------------------------------------
   # Lifecycle: Ignore provider/Azure-managed indexing policy normalization
   # ----------------------------------------------------------------------------------------------

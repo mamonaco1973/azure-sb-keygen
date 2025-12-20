@@ -40,12 +40,8 @@ resource "azurerm_servicebus_namespace" "keygen_ns" {
   name                = local.servicebus_namespace_name
   location            = azurerm_resource_group.project_rg.location
   resource_group_name = azurerm_resource_group.project_rg.name
-
-  sku = "Standard"
-
-  tags = {
-    project = "sb-keygen"
-  }
+  sku                 = "Standard"
+  local_auth_enabled  = false
 }
 
 # ------------------------------------------------------------------------------------------------
@@ -64,7 +60,7 @@ resource "azurerm_servicebus_queue" "keygen_queue" {
   # ----------------------------------------------------------------------------------------------
   # TTL + DLQ behavior
   # ----------------------------------------------------------------------------------------------
-  default_message_ttl                 = "PT10M"
+  default_message_ttl                  = "PT10M"
   dead_lettering_on_message_expiration = true
 
   # ----------------------------------------------------------------------------------------------
@@ -72,36 +68,5 @@ resource "azurerm_servicebus_queue" "keygen_queue" {
   # ----------------------------------------------------------------------------------------------
   max_size_in_megabytes        = 1024
   requires_duplicate_detection = false
-  requires_session            = false
+  requires_session             = false
 }
-
-# ------------------------------------------------------------------------------------------------
-# Queue SAS Authorization Rule (local dev / validate scripts)
-# ------------------------------------------------------------------------------------------------
-resource "azurerm_servicebus_queue_authorization_rule" "keygen_sas" {
-  name     = "keygen-sender-receiver"
-  queue_id = azurerm_servicebus_queue.keygen_queue.id
-
-  listen = true
-  send   = true
-  manage = false
-}
-
-# ------------------------------------------------------------------------------------------------
-# Outputs
-# ------------------------------------------------------------------------------------------------
-# output "servicebus_namespace_name" {
-#   description = "Auto-generated Service Bus namespace name."
-#   value       = azurerm_servicebus_namespace.keygen_ns.name
-# }
-
-# output "servicebus_queue_name" {
-#   description = "Service Bus queue name."
-#   value       = azurerm_servicebus_queue.keygen_queue.name
-# }
-
-# output "servicebus_queue_connection_string" {
-#   description = "Queue SAS connection string (local dev only)."
-#   value       = azurerm_servicebus_queue_authorization_rule.keygen_sas.primary_connection_string
-#   sensitive   = true
-# }
