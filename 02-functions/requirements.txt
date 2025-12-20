@@ -5,3 +5,5 @@
 azure-functions
 azure-identity
 azure-servicebus
+cryptography>=46.0.0
+azure-cosmos
