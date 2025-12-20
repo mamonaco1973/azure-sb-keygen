@@ -50,3 +50,22 @@ if [ $? -ne 0 ]; then
 fi
 cd ..
 
+# Phase 2: Deploy functions
+
+cd 02-functions
+
+rm -f app.zip
+
+zip -r app.zip . \
+  -x "*.git*" \
+  -x "*__pycache__*" \
+  -x "*.pytest_cache*" \
+  -x "*.venv*" \
+  -x "venv/*" \
+  -x ".venv/*" \
+  -x "*.DS_Store" \
+  -x "local.settings.json"
+
+
+cd ..
+
