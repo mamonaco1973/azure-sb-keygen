@@ -120,28 +120,28 @@ resource "azurerm_cosmosdb_sql_container" "results" {
 # ------------------------------------------------------------------------------------------------
 # Outputs
 # ------------------------------------------------------------------------------------------------
-output "cosmos_account_name" {
-  description = "Cosmos DB account name."
-  value       = azurerm_cosmosdb_account.keygen.name
-}
+# output "cosmos_account_name" {
+#   description = "Cosmos DB account name."
+#   value       = azurerm_cosmosdb_account.keygen.name
+# }
 
-output "cosmos_sql_database_name" {
-  description = "Cosmos DB SQL database name."
-  value       = azurerm_cosmosdb_sql_database.keygen.name
-}
+# output "cosmos_sql_database_name" {
+#   description = "Cosmos DB SQL database name."
+#   value       = azurerm_cosmosdb_sql_database.keygen.name
+# }
 
-output "cosmos_sql_container_name" {
-  description = "Cosmos DB SQL container name."
-  value       = azurerm_cosmosdb_sql_container.results.name
-}
+# output "cosmos_sql_container_name" {
+#   description = "Cosmos DB SQL container name."
+#   value       = azurerm_cosmosdb_sql_container.results.name
+# }
 
-output "cosmos_primary_key" {
-  description = "Cosmos DB primary key (local dev only)."
-  value       = azurerm_cosmosdb_account.keygen.primary_key
-  sensitive   = true
-}
+# output "cosmos_primary_key" {
+#   description = "Cosmos DB primary key (local dev only)."
+#   value       = azurerm_cosmosdb_account.keygen.primary_key
+#   sensitive   = true
+# }
 
-output "cosmos_endpoint" {
-  description = "Cosmos DB account endpoint."
-  value       = azurerm_cosmosdb_account.keygen.endpoint
-}
+# output "cosmos_endpoint" {
+#   description = "Cosmos DB account endpoint."
+#   value       = azurerm_cosmosdb_account.keygen.endpoint
+# }

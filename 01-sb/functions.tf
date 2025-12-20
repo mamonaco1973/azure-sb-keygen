@@ -157,17 +157,17 @@ resource "azurerm_linux_function_app" "keygen_func" {
 # ------------------------------------------------------------------------------------------------
 # Outputs
 # ------------------------------------------------------------------------------------------------
-output "function_app_name" {
-  description = "Function App name."
-  value       = azurerm_linux_function_app.keygen_func.name
-}
+# output "function_app_name" {
+#   description = "Function App name."
+#   value       = azurerm_linux_function_app.keygen_func.name
+# }
 
-output "function_app_default_hostname" {
-  description = "Function App default hostname."
-  value       = azurerm_linux_function_app.keygen_func.default_hostname
-}
+# output "function_app_default_hostname" {
+#   description = "Function App default hostname."
+#   value       = azurerm_linux_function_app.keygen_func.default_hostname
+# }
 
-output "function_app_identity_principal_id" {
-  description = "System-assigned managed identity principal id."
-  value       = azurerm_linux_function_app.keygen_func.identity[0].principal_id
-}
+# output "function_app_identity_principal_id" {
+#   description = "System-assigned managed identity principal id."
+#   value       = azurerm_linux_function_app.keygen_func.identity[0].principal_id
+# }
