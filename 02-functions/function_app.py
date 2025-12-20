@@ -70,16 +70,16 @@ def keygen_get(req: func.HttpRequest) -> func.HttpResponse:
 # -------------------------------------------------------------------------------------------------
 # Service Bus queue trigger (worker)
 # -------------------------------------------------------------------------------------------------
-@app.function_name(name="worker_keygen")
+@app.function_name(name="keygen_worker")
 @app.service_bus_queue_trigger(
     arg_name="msg",
     queue_name="%SERVICEBUS_QUEUE_NAME%",
     connection="ServiceBusConnection",
 )
-def sb_keygen_processor(msg: func.ServiceBusMessage) -> None:
+def keygen_processor(msg: func.ServiceBusMessage) -> None:
     import logging
     logging.info(
-        "worker_keygen received message: %s",
+        "keygen_processor received message: %s",
         msg.get_body().decode("utf-8")
     )
 
