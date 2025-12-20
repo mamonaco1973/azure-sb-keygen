@@ -23,16 +23,16 @@ def fetch_result(req: func.HttpRequest) -> func.HttpResponse:
         status_code=200
     )
 
-# -------------------------------------------------------------------------------------------------
-# Service Bus queue trigger (worker)
-# -------------------------------------------------------------------------------------------------
-@app.function_name(name="worker_keygen")
-@app.service_bus_queue_trigger(
-    arg_name="msg",
-    queue_name="%SERVICEBUS_QUEUE_NAME%",
-    connection="SERVICEBUS_CONN_STR",
-)
-def worker_keygen(msg: func.ServiceBusMessage) -> None:
-    # No return for SB triggers; just log for now.
-    import logging
-    logging.info("worker_keygen stub received message: %s", msg.get_body().decode("utf-8"))
+# # -------------------------------------------------------------------------------------------------
+# # Service Bus queue trigger (worker)
+# # -------------------------------------------------------------------------------------------------
+# @app.function_name(name="worker_keygen")
+# @app.service_bus_queue_trigger(
+#     arg_name="msg",
+#     queue_name="%SERVICEBUS_QUEUE_NAME%",
+#     connection="SERVICEBUS_CONN_STR",
+# )
+# def worker_keygen(msg: func.ServiceBusMessage) -> None:
+#     # No return for SB triggers; just log for now.
+#     import logging
+#     logging.info("worker_keygen stub received message: %s", msg.get_body().decode("utf-8"))
