@@ -90,18 +90,18 @@ resource "azurerm_servicebus_queue_authorization_rule" "keygen_sas" {
 # ------------------------------------------------------------------------------------------------
 # Outputs
 # ------------------------------------------------------------------------------------------------
-output "servicebus_namespace_name" {
-  description = "Auto-generated Service Bus namespace name."
-  value       = azurerm_servicebus_namespace.keygen_ns.name
-}
+# output "servicebus_namespace_name" {
+#   description = "Auto-generated Service Bus namespace name."
+#   value       = azurerm_servicebus_namespace.keygen_ns.name
+# }
 
-output "servicebus_queue_name" {
-  description = "Service Bus queue name."
-  value       = azurerm_servicebus_queue.keygen_queue.name
-}
+# output "servicebus_queue_name" {
+#   description = "Service Bus queue name."
+#   value       = azurerm_servicebus_queue.keygen_queue.name
+# }
 
-output "servicebus_queue_connection_string" {
-  description = "Queue SAS connection string (local dev only)."
-  value       = azurerm_servicebus_queue_authorization_rule.keygen_sas.primary_connection_string
-  sensitive   = true
-}
+# output "servicebus_queue_connection_string" {
+#   description = "Queue SAS connection string (local dev only)."
+#   value       = azurerm_servicebus_queue_authorization_rule.keygen_sas.primary_connection_string
+#   sensitive   = true
+# }
