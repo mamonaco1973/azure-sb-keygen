@@ -132,7 +132,7 @@ resource "azurerm_linux_function_app" "keygen_func" {
   # Service Bus (RBAC)
   # ----------------------------
   SERVICEBUS_QUEUE_NAME     = azurerm_servicebus_queue.keygen_queue.name
-  SERVICEBUS_NAMESPACE_FQDN = "${azurerm_servicebus_namespace.keygen.name}.servicebus.windows.net"
+  SERVICEBUS_NAMESPACE_FQDN = "${azurerm_servicebus_namespace.keygen_ns.name}.servicebus.windows.net"
 
   # ----------------------------
   # Cosmos DB (RBAC)
