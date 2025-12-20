@@ -11,7 +11,7 @@ from azure.servicebus import ServiceBusClient, ServiceBusMessage
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
 @app.route(route="keygen", methods=["POST"])
-def submit_keygen(req: func.HttpRequest) -> func.HttpResponse:
+def keygen_post(req: func.HttpRequest) -> func.HttpResponse:
     try:
         body = req.get_json()
     except Exception:
@@ -60,7 +60,7 @@ def submit_keygen(req: func.HttpRequest) -> func.HttpResponse:
 # GET /api/result/{request_id}
 # -------------------------------------------------------------------------------------------------
 @app.route(route="result/{request_id}", methods=["GET"])
-def fetch_result(req: func.HttpRequest) -> func.HttpResponse:
+def keygen_get(req: func.HttpRequest) -> func.HttpResponse:
     request_id = req.route_params.get("request_id")
     return func.HttpResponse(
         f"fetch_result stub: {request_id}",
