@@ -1,27 +1,38 @@
 import azure.functions as func
-import datetime
-import json
-import logging
 
-app = func.FunctionApp()
+app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
-@app.route(route="submit_keygen", auth_level=func.AuthLevel.Anonymous)
+# -------------------------------------------------------------------------------------------------
+# POST /api/keygen
+# -------------------------------------------------------------------------------------------------
+@app.route(route="keygen", methods=["POST"])
 def submit_keygen(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('Python HTTP trigger function processed a request.')
+    return func.HttpResponse(
+        "submit_keygen stub",
+        status_code=200
+    )
 
-    name = req.params.get('name')
-    if not name:
-        try:
-            req_body = req.get_json()
-        except ValueError:
-            pass
-        else:
-            name = req_body.get('name')
+# -------------------------------------------------------------------------------------------------
+# GET /api/result/{request_id}
+# -------------------------------------------------------------------------------------------------
+@app.route(route="result/{request_id}", methods=["GET"])
+def fetch_result(req: func.HttpRequest) -> func.HttpResponse:
+    request_id = req.route_params.get("request_id")
+    return func.HttpResponse(
+        f"fetch_result stub: {request_id}",
+        status_code=200
+    )
 
-    if name:
-        return func.HttpResponse(f"Hello, {name}. This HTTP triggered function executed successfully.")
-    else:
-        return func.HttpResponse(
-             "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.",
-             status_code=200
-        )
+# -------------------------------------------------------------------------------------------------
+# Service Bus queue trigger (worker)
+# -------------------------------------------------------------------------------------------------
+@app.function_name(name="worker_keygen")
+@app.service_bus_queue_trigger(
+    arg_name="msg",
+    queue_name="%SERVICEBUS_QUEUE_NAME%",
+    connection="SERVICEBUS_CONN_STR",
+)
+def worker_keygen(msg: func.ServiceBusMessage) -> None:
+    # No return for SB triggers; just log for now.
+    import logging
+    logging.info("worker_keygen stub received message: %s", msg.get_body().decode("utf-8"))
