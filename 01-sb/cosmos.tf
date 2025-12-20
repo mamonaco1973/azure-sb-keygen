@@ -118,26 +118,20 @@ resource "azurerm_cosmosdb_sql_container" "results" {
 }
 
 # ================================================================================================
-# Cosmos DB SQL RBAC
-# ================================================================================================
-# - Defines a custom Cosmos DB SQL API role for the keygen function.
-# - Assigns the role to the Function App's system-assigned managed identity.
+# Cosmos DB SQL RBAC: Custom Role for KeyGen Function
 # ================================================================================================
 
 resource "azurerm_cosmosdb_sql_role_definition" "keygen_cosmos_role" {
   name                = "KeygenCosmosRole"
-  resource_group_name = azurerm_resource_group.rg.name
-  account_name        = azurerm_cosmosdb_account.cosmos.name
+  resource_group_name = azurerm_resource_group.project_rg.name
+  account_name        = azurerm_cosmosdb_account.keygen.name
 
   type              = "CustomRole"
-  assignable_scopes = [azurerm_cosmosdb_account.cosmos.id]
+  assignable_scopes = [azurerm_cosmosdb_account.keygen.id]
 
   permissions {
     data_actions = [
-      # Read account/container metadata (common requirement for SDK operations)
       "Microsoft.DocumentDB/databaseAccounts/readMetadata",
-
-      # Container + item access for SQL API
       "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/*",
       "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers/items/*",
     ]
@@ -146,10 +140,10 @@ resource "azurerm_cosmosdb_sql_role_definition" "keygen_cosmos_role" {
 
 resource "azurerm_cosmosdb_sql_role_assignment" "keygen_cosmos_role_assignment" {
   name                = uuid()
-  resource_group_name = azurerm_resource_group.rg.name
-  account_name        = azurerm_cosmosdb_account.cosmos.name
+  resource_group_name = azurerm_resource_group.project_rg.name
+  account_name        = azurerm_cosmosdb_account.keygen.name
 
   principal_id       = azurerm_linux_function_app.keygen_func.identity[0].principal_id
   role_definition_id = azurerm_cosmosdb_sql_role_definition.keygen_cosmos_role.id
-  scope              = azurerm_cosmosdb_account.cosmos.id
+  scope              = azurerm_cosmosdb_account.keygen.id
 }
