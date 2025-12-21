@@ -1,3 +1,30 @@
+# ==============================================================================
+# Azure Functions: Service Bus–backed SSH key generation service
+#
+# Endpoints:
+#   - POST /api/keygen
+#       Queues a key generation request to Service Bus and returns request_id.
+#   - GET  /api/result/{request_id}
+#       Reads the result from Cosmos DB (200) or returns pending (202).
+#
+# Worker:
+#   - Service Bus queue trigger consumes requests, generates keys, and writes
+#     results into Cosmos DB using Managed Identity (RBAC).
+#
+# App Settings (required):
+#   - SERVICEBUS_NAMESPACE_FQDN
+#   - SERVICEBUS_QUEUE_NAME
+#   - ServiceBusConnection__fullyQualifiedNamespace
+#   - COSMOS_ENDPOINT
+#   - COSMOS_DATABASE_NAME
+#   - COSMOS_CONTAINER_NAME
+#
+# Notes:
+#   - Cosmos container must have TTL enabled to honor "ttl" field deletion.
+#   - This implementation stores the Cosmos "id" as request_id.
+#   - read_item() assumes the container partition key value equals request_id.
+# ==============================================================================
+
 import json
 import os
 import uuid
@@ -15,6 +42,14 @@ from azure.cosmos import CosmosClient, exceptions as cosmos_exceptions
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
+# ------------------------------------------------------------------------------
+# POST /api/keygen
+# ------------------------------------------------------------------------------
+# - Accepts JSON body:
+#     {"key_type": "rsa"|"ed25519", "key_bits": 2048}
+# - Enqueues a request to Service Bus using DefaultAzureCredential.
+# - Returns 202 with request_id for polling via GET /api/result/{request_id}.
+# ------------------------------------------------------------------------------
 @app.route(route="keygen", methods=["POST"])
 def keygen_post(req: func.HttpRequest) -> func.HttpResponse:
     try:
@@ -31,14 +66,16 @@ def keygen_post(req: func.HttpRequest) -> func.HttpResponse:
     }
 
     sb_namespace = os.environ["SERVICEBUS_NAMESPACE_FQDN"]
-    queue_name   = os.environ["SERVICEBUS_QUEUE_NAME"]
+    queue_name = os.environ["SERVICEBUS_QUEUE_NAME"]
 
+    # DefaultAzureCredential supports Managed Identity in Azure, and other
+    # identities locally (Azure CLI, VS Code, environment credentials).
     credential = DefaultAzureCredential()
 
     try:
         with ServiceBusClient(
             fully_qualified_namespace=sb_namespace,
-            credential=credential
+            credential=credential,
         ) as client:
             with client.get_queue_sender(queue_name=queue_name) as sender:
                 sender.send_messages(
@@ -61,9 +98,16 @@ def keygen_post(req: func.HttpRequest) -> func.HttpResponse:
         mimetype="application/json",
     )
 
-# -------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # GET /api/result/{request_id}
-# -------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# - Attempts to read the Cosmos DB item for request_id.
+# - Returns:
+#     200: Item found (status: complete)
+#     202: Item not found yet (status: pending)
+#     400: Missing request_id
+#     500: Unexpected read error
+# ------------------------------------------------------------------------------
 @app.route(route="result/{request_id}", methods=["GET"])
 def keygen_get(req: func.HttpRequest) -> func.HttpResponse:
     request_id = req.route_params.get("request_id")
@@ -77,16 +121,19 @@ def keygen_get(req: func.HttpRequest) -> func.HttpResponse:
     logging.info("Fetching result for request_id: %s", request_id)
 
     endpoint = os.environ["COSMOS_ENDPOINT"]
-    db_name  = os.environ["COSMOS_DATABASE_NAME"]
+    db_name = os.environ["COSMOS_DATABASE_NAME"]
     ctr_name = os.environ["COSMOS_CONTAINER_NAME"]
 
     try:
+        # Use Managed Identity / RBAC to access Cosmos (no account keys).
         credential = DefaultAzureCredential()
         client = CosmosClient(endpoint, credential=credential)
-        container = client.get_database_client(db_name).get_container_client(ctr_name)
+        container = client.get_database_client(db_name).get_container_client(
+            ctr_name
+        )
 
-        # We stored id=request_id, so read by (id, partition_key)
-        # If your container partition key is /id, this is correct:
+        # Item lookup uses (id, partition_key). This assumes the partition key
+        # value is request_id (commonly partition key path "/id" or "/request_id").
         item = container.read_item(item=request_id, partition_key=request_id)
 
         return func.HttpResponse(
@@ -96,7 +143,7 @@ def keygen_get(req: func.HttpRequest) -> func.HttpResponse:
         )
 
     except cosmos_exceptions.CosmosResourceNotFoundError:
-        # Not found => pending (matches your DynamoDB behavior)
+        # Not found => pending (mirrors DynamoDB "not yet written" behavior).
         return func.HttpResponse(
             json.dumps({"status": "pending", "request_id": request_id}),
             status_code=202,
@@ -112,21 +159,31 @@ def keygen_get(req: func.HttpRequest) -> func.HttpResponse:
         )
 
 # ------------------------------------------------------------------------------
-# SSH Key Generation Logic
+# SSH key generation logic
+# ------------------------------------------------------------------------------
+# - Generates either RSA or Ed25519 SSH keypairs.
+# - Returns:
+#     (public_key_openssh_str, private_key_pem_str)
 # ------------------------------------------------------------------------------
 def generate_keypair(key_type: str = "rsa", key_bits: int = 2048):
     """Generate SSH keypair and return (public, private) strings."""
     if key_type == "rsa":
-        priv = rsa.generate_private_key(public_exponent=65537, key_size=key_bits)
+        priv = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=key_bits,
+        )
     elif key_type == "ed25519":
         priv = ed25519.Ed25519PrivateKey.generate()
     else:
-        logging.warning(f"Unknown key type '{key_type}', defaulting to RSA.")
-        priv = rsa.generate_private_key(public_exponent=65537, key_size=key_bits)
+        logging.warning("Unknown key type '%s', defaulting to RSA.", key_type)
+        priv = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=key_bits,
+        )
 
     pub_ssh = priv.public_key().public_bytes(
         serialization.Encoding.OpenSSH,
-        serialization.PublicFormat.OpenSSH
+        serialization.PublicFormat.OpenSSH,
     ).decode()
 
     if key_type == "ed25519":
@@ -137,14 +194,18 @@ def generate_keypair(key_type: str = "rsa", key_bits: int = 2048):
     priv_pem = priv.private_bytes(
         serialization.Encoding.PEM,
         priv_format,
-        serialization.NoEncryption()
+        serialization.NoEncryption(),
     ).decode()
 
     return pub_ssh, priv_pem
 
-# -------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Service Bus queue trigger (worker)
-# -------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# - Reads request messages from the queue.
+# - Generates keys and writes results to Cosmos DB.
+# - Raises on failure so the message can be retried / dead-lettered.
+# ------------------------------------------------------------------------------
 @app.function_name(name="keygen_worker")
 @app.service_bus_queue_trigger(
     arg_name="msg",
@@ -156,7 +217,7 @@ def keygen_processor(msg: func.ServiceBusMessage) -> None:
         raw = msg.get_body().decode("utf-8")
         body = json.loads(raw)
 
-        # Prefer request_id in payload; fall back to SB correlation_id if present
+        # Prefer request_id in payload; fall back to SB correlation_id.
         request_id = (
             body.get("request_id")
             or getattr(msg, "correlation_id", None)
@@ -170,7 +231,12 @@ def keygen_processor(msg: func.ServiceBusMessage) -> None:
         except Exception:
             key_bits = 2048
 
-        logging.info("Processing request %s (%s-%s)", request_id, key_type, key_bits)
+        logging.info(
+            "Processing request %s (%s-%s)",
+            request_id,
+            key_type,
+            key_bits,
+        )
 
         # ----------------------------------------------------------------------
         # Generate SSH keypair
@@ -180,19 +246,17 @@ def keygen_processor(msg: func.ServiceBusMessage) -> None:
         # ----------------------------------------------------------------------
         # Prepare result document for Cosmos DB
         # ----------------------------------------------------------------------
+        # ttl: Seconds-to-live (relative). Requires container TTL enabled.
+        # expires_at: Optional epoch timestamp for troubleshooting/visibility.
         result = {
-            "id": request_id,   # Cosmos requires an "id"
+            "id": request_id,
             "request_id": request_id,
             "status": "complete",
             "key_type": key_type,
             "key_bits": key_bits,
             "public_key_b64": base64.b64encode(pub.encode()).decode(),
             "private_key_b64": base64.b64encode(priv.encode()).decode(),
-
-            # Cosmos TTL is seconds-to-live (relative) when TTL is enabled
             "ttl": 86400,
-
-            # Optional: if you still want an absolute expiry timestamp for debugging
             "expires_at": int(time.time()) + 86400,
         }
 
@@ -200,14 +264,14 @@ def keygen_processor(msg: func.ServiceBusMessage) -> None:
         # Store result in Cosmos DB (RBAC / Managed Identity)
         # ----------------------------------------------------------------------
         endpoint = os.environ["COSMOS_ENDPOINT"]
-        db_name  = os.environ["COSMOS_DATABASE_NAME"]
+        db_name = os.environ["COSMOS_DATABASE_NAME"]
         ctr_name = os.environ["COSMOS_CONTAINER_NAME"]
 
         credential = DefaultAzureCredential()
-
-        # Key change: use token credential (RBAC), not account key
         client = CosmosClient(endpoint, credential=credential)
-        container = client.get_database_client(db_name).get_container_client(ctr_name)
+        container = client.get_database_client(db_name).get_container_client(
+            ctr_name
+        )
 
         container.upsert_item(result)
 
