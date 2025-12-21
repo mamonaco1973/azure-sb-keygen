@@ -75,3 +75,25 @@ az functionapp deployment source config-zip --name "$FunctionAppName" --resource
 
 cd ..
 
+# Phase 3: Deploy web app
+
+URL="https://$(az functionapp show \
+  --name "$FunctionAppName" \
+  --resource-group sb-keygen-rg \
+  --query "defaultHostName" \
+  -o tsv)/api/"
+
+export API_BASE="${URL}"
+echo "NOTE: FunctionApp URL - ${API_BASE}"
+
+cd 03-webapp || { echo "ERROR: 03-webapp directory missing."; exit 1; }
+
+envsubst '${API_BASE}' < index.html.tmpl > index.html || {
+  echo "ERROR: Failed to generate index.html file. Exiting."
+  exit 1
+}
+
+terraform init
+terraform apply -auto-approve
+
+cd ..
