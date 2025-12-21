@@ -66,14 +66,14 @@ resource "azurerm_storage_account_static_website" "static" {
 resource "azurerm_storage_blob" "index" {
   name                   = "index.html"
   storage_account_name   = azurerm_storage_account.static_site.name
-  storage_container_name = azurerm_storage_container.web.name
+  storage_container_name = "$web"
   type                   = "Block"
 
   source       = "${path.root}/index.html"
   content_type = "text/html"
 
   depends_on = [
-    azurerm_storage_container.web
+    azurerm_storage_account_static_website.static
   ]
 }
 
