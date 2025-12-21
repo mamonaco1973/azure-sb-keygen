@@ -60,20 +60,6 @@ resource "azurerm_storage_account_static_website" "static" {
   index_document     = "index.html"
   error_404_document = "404.html"
 }
-
-# ------------------------------------------------------------------------------------------------
-# $web container (explicit to avoid first-apply race)
-# ------------------------------------------------------------------------------------------------
-resource "azurerm_storage_container" "web" {
-  name                  = "$web"
-  storage_account_id   = azurerm_storage_account.static_site.id
-  container_access_type = "private"
-
-  depends_on = [
-    azurerm_storage_account_static_website.static
-  ]
-}
-
 # ------------------------------------------------------------------------------------------------
 # Upload index.html (from current directory)
 # ------------------------------------------------------------------------------------------------
