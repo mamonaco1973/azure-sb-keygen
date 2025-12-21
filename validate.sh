@@ -3,25 +3,33 @@
 # File: validate.sh
 # ================================================================================================
 # Purpose:
-#   End-to-end validation for the KeyGen microservice.
-#   - Discovers the deployed API Gateway endpoint automatically via AWS CLI.
-#   - Submits a key generation request to the Lambda-based API.
+#   End-to-end validation for the Azure Service Bus KeyGen microservice.
+#   - Discovers the deployed Azure Function App endpoint via Azure CLI.
+#   - Submits a key generation request to the HTTP-triggered Function endpoint.
 #   - Parses the returned request_id.
-#   - Polls the result endpoint until the generated SSH keypair is ready.
+#   - Polls the result endpoint until the generated SSH keypair is available.
 #
 # Requirements:
-#   - curl, jq, and AWS CLI installed and authenticated.
-#   - Terraform deployment of 'keygen-api' completed successfully.
+#   - curl, jq, and Azure CLI installed and authenticated.
+#   - Terraform deployment of the Azure Function App completed successfully.
+#   - Resource group name matches the deployment (default used here: sb-keygen-rg).
 #   - Optional env vars:
 #       KEY_TYPE = rsa | ed25519            (default: rsa)
 #       KEY_BITS = 2048 | 4096 (RSA only)   (default: 2048)
+#
+# Notes:
+#   - This script assumes your Function App exposes:
+#       POST /api/keygen
+#       GET  /api/result/{request_id}
+#   - If your Function App requires a function key, you must include it (x-functions-key
+#     header or ?code= query string), and your CORS settings must allow your caller.
 # ================================================================================================
 set -euo pipefail
 
 # -----------------------------------------------------------------------------------------------
-# Step 1: Discover Function App API Gateway endpoint
+# Step 1: Discover Azure Function App endpoint
 # -----------------------------------------------------------------------------------------------
-echo "NOTE: Retrieving Function App API Endpoint..."
+echo "NOTE: Retrieving Azure Function App API endpoint..."
 
 # Discover the Function App name created by Terraform
 FunctionAppName=$(az functionapp list \
@@ -36,7 +44,7 @@ URL="https://$(az functionapp show \
   -o tsv)/api"
 
 export API_BASE="${URL}"
-echo "NOTE: Function App Endpoint - ${API_BASE}"
+echo "NOTE: Function App endpoint - ${API_BASE}"
 
 # -----------------------------------------------------------------------------------------------
 # Step 2: Submit SSH key generation request
@@ -60,7 +68,7 @@ if [[ -z "$REQUEST_ID" ]]; then
   exit 1
 fi
 
-echo "NOTE: Submitted keygen request ($REQUEST_ID)."
+echo "NOTE: Submitted keygen request (${REQUEST_ID})."
 echo "NOTE: Polling for result..."
 
 # -----------------------------------------------------------------------------------------------
