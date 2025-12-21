@@ -102,7 +102,7 @@ URL="https://$(az functionapp show \
   --name "$FunctionAppName" \
   --resource-group sb-keygen-rg \
   --query "defaultHostName" \
-  -o tsv)/api/"
+  -o tsv)/api"
 
 export API_BASE="${URL}"
 echo "NOTE: Function App API URL: ${API_BASE}"
