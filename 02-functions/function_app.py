@@ -2,6 +2,8 @@ import json
 import os
 import uuid
 import logging
+import base64
+import time
 
 import azure.functions as func
 
@@ -9,6 +11,7 @@ from azure.identity import DefaultAzureCredential
 from azure.servicebus import ServiceBusClient, ServiceBusMessage
 from cryptography.hazmat.primitives.asymmetric import rsa, ed25519
 from cryptography.hazmat.primitives import serialization
+from azure.cosmos import CosmosClient
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -110,9 +113,66 @@ def generate_keypair(key_type: str = "rsa", key_bits: int = 2048):
     connection="ServiceBusConnection",
 )
 def keygen_processor(msg: func.ServiceBusMessage) -> None:
-    logging.info(
-        "keygen_processor received message: %s",
-        msg.get_body().decode("utf-8")
-    )
+    try:
+        raw = msg.get_body().decode("utf-8")
+        body = json.loads(raw)
 
-    # TODO: parse JSON, generate keys, write to Cosmos
+        # Prefer request_id in payload; fall back to SB correlation_id if present
+        request_id = (
+            body.get("request_id")
+            or getattr(msg, "correlation_id", None)
+            or "unknown"
+        )
+
+        key_type = body.get("key_type", "rsa")
+        key_bits = body.get("key_bits", 2048)
+        try:
+            key_bits = int(key_bits)
+        except Exception:
+            key_bits = 2048
+
+        logging.info("Processing request %s (%s-%s)", request_id, key_type, key_bits)
+
+        # ----------------------------------------------------------------------
+        # Generate SSH keypair
+        # ----------------------------------------------------------------------
+        pub, priv = generate_keypair(key_type, key_bits)
+
+        # ----------------------------------------------------------------------
+        # Prepare result document for Cosmos DB
+        # ----------------------------------------------------------------------
+        result = {
+            "id": request_id,   # Cosmos requires an "id"
+            "request_id": request_id,
+            "status": "complete",
+            "key_type": key_type,
+            "public_key_b64": base64.b64encode(pub.encode()).decode(),
+            "private_key_b64": base64.b64encode(priv.encode()).decode(),
+
+            # Cosmos TTL is seconds-to-live (relative) when TTL is enabled
+            "ttl": 86400,
+
+            # Optional: if you still want an absolute expiry timestamp for debugging
+            "expires_at": int(time.time()) + 86400,
+        }
+
+        # ----------------------------------------------------------------------
+        # Store result in Cosmos DB (RBAC / Managed Identity)
+        # ----------------------------------------------------------------------
+        endpoint = os.environ["COSMOS_ENDPOINT"]
+        db_name  = os.environ["COSMOS_DATABASE_NAME"]
+        ctr_name = os.environ["COSMOS_CONTAINER_NAME"]
+
+        credential = DefaultAzureCredential()
+
+        # Key change: use token credential (RBAC), not account key
+        client = CosmosClient(endpoint, credential=credential)
+        container = client.get_database_client(db_name).get_container_client(ctr_name)
+
+        container.upsert_item(result)
+
+        logging.info("Stored result in Cosmos for %s", request_id)
+
+    except Exception as e:
+        logging.exception("Failed processing message: %s", e)
+        raise
