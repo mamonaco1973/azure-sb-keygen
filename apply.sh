@@ -1,57 +1,67 @@
 #!/bin/bash
-# ================================================================================
+# ================================================================================================
 # Build Script for Azure Service Bus Deployment
-#
+# ================================================================================================
 # Purpose:
-#   - Validates the local environment and required tooling before provisioning.
-#   - Deploys Azure messaging infrastructure using Terraform.
-#   - Provisions core Azure resources for Service Bus–based workloads.
-#   - Ensures failures are caught early with explicit exit conditions.
+#   - Validates the local environment before provisioning Azure resources.
+#   - Deploys Service Bus–based messaging infrastructure using Terraform.
+#   - Packages and deploys Azure Functions application code.
+#   - Deploys a static web front end backed by the Functions API.
+#   - Fails fast to prevent partial or inconsistent deployments.
 #
 # Deployment Flow:
 #   1. Messaging layer:
-#      - Azure Service Bus namespace
-#      - Service Bus entities (queues / topics as defined in Terraform)
+#      - Azure Service Bus namespace and messaging entities
 #      - Supporting storage account resources
+#   2. Compute layer:
+#      - Azure Functions application code deployment
+#   3. Presentation layer:
+#      - Static web application deployment
 #
 # Notes:
 #   - Assumes `az` (Azure CLI) and `terraform` are installed and authenticated.
-#   - Assumes `check_env.sh` validates required environment variables and tools.
-# ================================================================================
-
+#   - Assumes `check_env.sh` validates required tools and environment variables.
+# ================================================================================================
 
 set -e  # Exit immediately on any unhandled command failure
 
-# --------------------------------------------------------------------------------------------------
-# Pre-flight Check: Validate environment
-# Runs custom environment validation script (`check_env.sh`) to ensure:
-#   - Azure CLI is logged in and subscription is set
-#   - Terraform is installed
-#   - Required variables (subscription ID, tenant ID, etc.) are present
-# --------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------
+# Pre-flight Check: Validate Local Environment
+# ------------------------------------------------------------------------------------------------
+# - Ensures Azure CLI authentication and subscription context are valid.
+# - Verifies Terraform is installed and available in PATH.
+# - Confirms required environment variables are present.
+# ------------------------------------------------------------------------------------------------
 ./check_env.sh
 if [ $? -ne 0 ]; then
-  echo "ERROR: Environment check failed. Exiting."
+  echo "ERROR: Environment validation failed. Exiting."
   exit 1
 fi
 
-# --------------------------------------------------------------------------------------------------
-# Phase 1: Deploy servce bus and storage account
-# --------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------
+# Phase 1: Deploy Service Bus and Storage Resources
+# ------------------------------------------------------------------------------------------------
+# - Provisions Azure Service Bus namespace and messaging entities.
+# - Provisions supporting storage account resources.
+# ------------------------------------------------------------------------------------------------
 cd 01-sb
 
-terraform init   # Initialize Terraform working directory (download providers/modules)
-terraform apply -auto-approve   # Deploy Key Vault and other directory resources
+terraform init
+terraform apply -auto-approve
 
-# Error handling for Terraform apply
 if [ $? -ne 0 ]; then
   echo "ERROR: Terraform apply failed in 01-sb. Exiting."
   exit 1
 fi
+
 cd ..
 
-# Phase 2: Deploy functions
-
+# ------------------------------------------------------------------------------------------------
+# Phase 2: Deploy Azure Functions Application
+# ------------------------------------------------------------------------------------------------
+# - Packages the Functions application into a ZIP archive.
+# - Publishes the application using the Azure CLI.
+# ------------------------------------------------------------------------------------------------
 cd 02-functions
 
 rm -f app.zip
@@ -66,17 +76,28 @@ zip -r app.zip . \
   -x "*.DS_Store" \
   -x "local.settings.json"
 
+# Discover the Function App name created by Terraform
+FunctionAppName=$(az functionapp list \
+  --resource-group sb-keygen-rg \
+  --query "[?starts_with(name, 'func-keygen-')].name" \
+  --output tsv)
 
-# Get the Function App name
-FunctionAppName=$(az functionapp list --resource-group sb-keygen-rg --query "[?starts_with(name, 'func-keygen-')].name" --output tsv)
-
-# Publish the latest code using the AZ CLI
-az functionapp deployment source config-zip --name "$FunctionAppName" --resource-group sb-keygen-rg --src app.zip --build-remote true
+# Publish the Functions code using ZIP deployment
+az functionapp deployment source config-zip \
+  --name "$FunctionAppName" \
+  --resource-group sb-keygen-rg \
+  --src app.zip \
+  --build-remote true
 
 cd ..
 
-# Phase 3: Deploy web app
-
+# ------------------------------------------------------------------------------------------------
+# Phase 3: Deploy Static Web Application
+# ------------------------------------------------------------------------------------------------
+# - Resolves the Azure Functions API endpoint.
+# - Injects the API base URL into the web template.
+# - Deploys the static web resources using Terraform.
+# ------------------------------------------------------------------------------------------------
 URL="https://$(az functionapp show \
   --name "$FunctionAppName" \
   --resource-group sb-keygen-rg \
@@ -84,12 +105,15 @@ URL="https://$(az functionapp show \
   -o tsv)/api/"
 
 export API_BASE="${URL}"
-echo "NOTE: FunctionApp URL - ${API_BASE}"
+echo "NOTE: Function App API URL: ${API_BASE}"
 
-cd 03-webapp || { echo "ERROR: 03-webapp directory missing."; exit 1; }
+cd 03-webapp || {
+  echo "ERROR: 03-webapp directory not found. Exiting."
+  exit 1
+}
 
 envsubst '${API_BASE}' < index.html.tmpl > index.html || {
-  echo "ERROR: Failed to generate index.html file. Exiting."
+  echo "ERROR: Failed to generate index.html. Exiting."
   exit 1
 }
 
