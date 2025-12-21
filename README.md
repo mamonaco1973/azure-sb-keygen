@@ -1,4 +1,4 @@
-# Azure SSH KeyGen Microservice with Service Bus, Azure Functions, Cosmos DB, and Function App
+# Azure SSH KeyGen Microservice 
 
 This project delivers a fully automated **serverless SSH key generation service**
 on **Microsoft Azure**, built using **Azure Service Bus**, **Azure Functions
