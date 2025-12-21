@@ -29,7 +29,7 @@ resource "random_string" "static_suffix" {
 # ------------------------------------------------------------------------------------------------
 locals {
   # Storage account names must be 3-24 chars, lowercase letters + numbers only.
-  static_site_name = "ststatic${random_string.static_suffix.result}"
+  static_site_name = "keygen${random_string.static_suffix.result}"
 }
 
 # ------------------------------------------------------------------------------------------------
