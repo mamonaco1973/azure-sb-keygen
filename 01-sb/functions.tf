@@ -117,6 +117,11 @@ resource "azurerm_linux_function_app" "keygen_func" {
     application_stack {
       python_version = "3.11"
     }
+  
+    cors {
+    allowed_origins     = ["*"]
+    support_credentials = false
+    }
   }
 
   # ----------------------------------------------------------------------------------------------

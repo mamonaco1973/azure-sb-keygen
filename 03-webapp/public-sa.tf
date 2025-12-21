@@ -80,10 +80,6 @@ resource "azurerm_storage_blob" "index" {
 # ------------------------------------------------------------------------------------------------
 # Outputs
 # ------------------------------------------------------------------------------------------------
-output "static_site_url" {
-  description = "Public base URL for the static website"
-  value       = azurerm_storage_account.static_site.primary_web_endpoint
-}
 
 output "index_page_url" {
   description = "Direct URL to index.html"
