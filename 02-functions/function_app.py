@@ -11,7 +11,7 @@ from azure.identity import DefaultAzureCredential
 from azure.servicebus import ServiceBusClient, ServiceBusMessage
 from cryptography.hazmat.primitives.asymmetric import rsa, ed25519
 from cryptography.hazmat.primitives import serialization
-from azure.cosmos import CosmosClient
+from azure.cosmos import CosmosClient, exceptions as cosmos_exceptions
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -67,10 +67,49 @@ def keygen_post(req: func.HttpRequest) -> func.HttpResponse:
 @app.route(route="result/{request_id}", methods=["GET"])
 def keygen_get(req: func.HttpRequest) -> func.HttpResponse:
     request_id = req.route_params.get("request_id")
-    return func.HttpResponse(
-        f"fetch_result stub: {request_id}",
-        status_code=200
-    )
+    if not request_id:
+        return func.HttpResponse(
+            json.dumps({"error": "Missing request_id"}),
+            status_code=400,
+            mimetype="application/json",
+        )
+
+    logging.info("Fetching result for request_id: %s", request_id)
+
+    endpoint = os.environ["COSMOS_ENDPOINT"]
+    db_name  = os.environ["COSMOS_DATABASE_NAME"]
+    ctr_name = os.environ["COSMOS_CONTAINER_NAME"]
+
+    try:
+        credential = DefaultAzureCredential()
+        client = CosmosClient(endpoint, credential=credential)
+        container = client.get_database_client(db_name).get_container_client(ctr_name)
+
+        # We stored id=request_id, so read by (id, partition_key)
+        # If your container partition key is /id, this is correct:
+        item = container.read_item(item=request_id, partition_key=request_id)
+
+        return func.HttpResponse(
+            json.dumps(item),
+            status_code=200,
+            mimetype="application/json",
+        )
+
+    except cosmos_exceptions.CosmosResourceNotFoundError:
+        # Not found => pending (matches your DynamoDB behavior)
+        return func.HttpResponse(
+            json.dumps({"status": "pending", "request_id": request_id}),
+            status_code=202,
+            mimetype="application/json",
+        )
+
+    except Exception as e:
+        logging.exception("Cosmos read_item failed: %s", e)
+        return func.HttpResponse(
+            json.dumps({"error": "Internal server error"}),
+            status_code=500,
+            mimetype="application/json",
+        )
 
 # ------------------------------------------------------------------------------
 # SSH Key Generation Logic
