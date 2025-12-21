@@ -185,6 +185,7 @@ def keygen_processor(msg: func.ServiceBusMessage) -> None:
             "request_id": request_id,
             "status": "complete",
             "key_type": key_type,
+            "key_bits": key_bits,
             "public_key_b64": base64.b64encode(pub.encode()).decode(),
             "private_key_b64": base64.b64encode(priv.encode()).decode(),
 
