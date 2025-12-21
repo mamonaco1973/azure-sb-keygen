@@ -21,7 +21,7 @@ set -euo pipefail
 # -----------------------------------------------------------------------------------------------
 # Step 1: Discover Function App API Gateway endpoint
 # -----------------------------------------------------------------------------------------------
-echo "NOTE: Function App API endpoint..."
+echo "NOTE: Retrieving Function App API Endpoint..."
 
 # Discover the Function App name created by Terraform
 FunctionAppName=$(az functionapp list \
@@ -36,7 +36,7 @@ URL="https://$(az functionapp show \
   -o tsv)/api"
 
 export API_BASE="${URL}"
-echo "NOTE: Function App URL - ${API_BASE}"
+echo "NOTE: Function App Endpoint - ${API_BASE}"
 
 # -----------------------------------------------------------------------------------------------
 # Step 2: Submit SSH key generation request
