@@ -155,3 +155,92 @@ flowchart TD
     A -->|"HTTPS GET /api/result/{request_id}"| F["Azure Functions (HTTP Trigger)"]
     F -->|"Read by request_id"| E
     F -->|"Return JSON response"| A
+```
+
+## Prerequisites
+
+* [An Azure Account](https://portal.azure.com/)
+* [Install AZ CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) 
+* [Install Latest Terraform](https://developer.hashicorp.com/terraform/install)
+
+If this is your first time watching our content, we recommend starting with this video: [Azure + Terraform: Easy Setup](https://www.youtube.com/watch?v=j4aRjgH5H8Q). It provides a step-by-step guide to properly configure Terraform, Packer, and the AZ CLI.
+
+## Download this Repository
+
+```bash
+git clone https://github.com/mamonaco1973/aws-sqs-keygen.git
+cd aws-sqs-keygen
+```
+
+## Build the Code
+
+Run [check_env](check_env.sh) to validate your environment, then run [apply](apply.sh) to provision the infrastructure.
+
+```bash
+azureuser@develop-vm:~/azure-sb-keygen$ ./check_env.sh
+NOTE: Validating that required commands are found in your PATH.
+NOTE: az is found in the current PATH.
+NOTE: terraform is found in the current PATH.
+NOTE: jq is found in the current PATH.
+NOTE: zip is found in the current PATH.
+NOTE: All required commands are available.
+NOTE: Validating that required environment variables are set.
+NOTE: ARM_CLIENT_ID is set.
+NOTE: ARM_CLIENT_SECRET is set.
+NOTE: ARM_SUBSCRIPTION_ID is set.
+NOTE: ARM_TENANT_ID is set.
+NOTE: All required environment variables are set.
+NOTE: Logging in to Azure using Service Principal...
+NOTE: Successfully logged into Azure.
+Initializing the backend...
+```
+
+### Build Results
+
+When the deployment completes, the following resources are created:
+
+- **Core Infrastructure:**  
+  - Fully serverless architecture—no virtual machines or long-running compute required  
+  - Terraform-managed provisioning of Azure Functions, Service Bus, Cosmos DB, Storage, and monitoring resources  
+  - Event-driven message pipeline enabling asynchronous SSH key generation and result retrieval  
+
+- **Identity & Security:**  
+  - System-assigned Managed Identity for Azure Functions with least-privilege RBAC access  
+  - Secure access from Functions to Service Bus and Cosmos DB without secrets or keys  
+  - Optional encryption-at-rest using Azure-managed keys for Service Bus and Cosmos DB  
+  - SSH keys generated entirely in memory with no local file persistence  
+
+- **Azure Service Bus Queue:**  
+  - Dedicated request queue for inbound SSH key generation jobs  
+  - Decouples HTTP request submission from background key processing  
+  - Provides durability, retry handling, and back-pressure for Function workers  
+
+- **Azure Cosmos DB:**  
+  - Central results container keyed by unique `request_id`  
+  - Stores request status, key metadata, and base64-encoded keypair output  
+  - Configured with Time-to-Live (TTL) for automatic expiration and cost control  
+
+- **Azure Functions (Python):**  
+  - HTTP-triggered Functions for submitting requests and retrieving results  
+  - Queue-triggered Function for asynchronous SSH key generation  
+  - Supports RSA-2048, RSA-4096, and Ed25519 key types via request payload  
+  - Emits structured logs and metrics to Azure Monitor and Application Insights  
+
+- **HTTP API Layer:**  
+  - HTTPS endpoints exposed directly via Azure Functions (`/api/keygen`, `/api/result/{request_id}`)  
+  - Stateless request handling suitable for browser clients and CLI integrations  
+  - JSON-based request/response model aligned with REST-style workflows  
+
+- **Static Web Application (Azure Storage):**  
+  - Storage account configured for static website hosting  
+  - `index.html` frontend allows users to submit key requests and poll for results  
+  - Dynamically calls Azure Function endpoints published as Terraform outputs  
+
+- **Automation & Validation:**  
+  - `apply.sh`, `destroy.sh`, and `check_env.sh` scripts automate provisioning, teardown, and environment validation  
+  - Terraform enforces consistent, repeatable deployments across environments  
+  - Entire workflow runs using Azure CLI authentication, Terraform, and Python—no manual setup required  
+
+Together, these resources form a **serverless, event-driven SSH KeyGen pipeline**
+on Azure, demonstrating cloud-native design principles with automatic scaling,
+strong security boundaries, and minimal operational overhead.
