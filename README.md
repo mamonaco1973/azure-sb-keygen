@@ -168,8 +168,8 @@ If this is your first time watching our content, we recommend starting with this
 ## Download this Repository
 
 ```bash
-git clone https://github.com/mamonaco1973/aws-sqs-keygen.git
-cd aws-sqs-keygen
+git clone https://github.com/mamonaco1973/azure-sb-keygen.git
+cd azure-sb-keygen
 ```
 
 ## Build the Code
