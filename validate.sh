@@ -49,7 +49,7 @@ URL="https://$(az functionapp show \
   -o tsv)/api"
 
 export API_BASE="${URL}"
-echo "NOTE: Function App endpoint - ${API_BASE}"
+echo "NOTE: Function App endpoint : ${API_BASE}"
 
 # -----------------------------------------------------------------------------------------------
 # Step 2: Submit SSH key generation request
