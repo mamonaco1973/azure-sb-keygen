@@ -101,7 +101,7 @@ cd ..
 URL="https://$(az functionapp show \
   --name "$FunctionAppName" \
   --resource-group sb-keygen-rg \
-  --query "defaultHostName" \
+  --query "properties.defaultHostName" \
   -o tsv)/api"
 
 export API_BASE="${URL}"
