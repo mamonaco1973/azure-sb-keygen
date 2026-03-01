@@ -157,19 +157,16 @@ resource "azurerm_function_app_flex_consumption" "keygen_func" {
     # Flex rejects FUNCTIONS_WORKER_RUNTIME. Do not set it here.
     FUNCTIONS_EXTENSION_VERSION = "~4"
 
-    APPLICATIONINSIGHTS_CONNECTION_STRING =
-      azurerm_application_insights.func_ai.connection_string
+    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.func_ai.connection_string
 
     # ----------------------------
     # Service Bus (RBAC)
     # ----------------------------
     SERVICEBUS_QUEUE_NAME = azurerm_servicebus_queue.keygen_queue.name
 
-    SERVICEBUS_NAMESPACE_FQDN =
-      "${azurerm_servicebus_namespace.keygen_ns.name}.servicebus.windows.net"
+    SERVICEBUS_NAMESPACE_FQDN = "${azurerm_servicebus_namespace.keygen_ns.name}.servicebus.windows.net"
 
-    ServiceBusConnection__fullyQualifiedNamespace =
-      "${azurerm_servicebus_namespace.keygen_ns.name}.servicebus.windows.net"
+    ServiceBusConnection__fullyQualifiedNamespace = "${azurerm_servicebus_namespace.keygen_ns.name}.servicebus.windows.net"
 
     # ----------------------------
     # Cosmos DB (RBAC)
