@@ -1,106 +1,147 @@
 #!/bin/bash
-# ================================================================================================
-# File: validate.sh
-# ================================================================================================
+# ==============================================================================
+# validate.sh - KeyGen Quick Start Validation
+# ------------------------------------------------------------------------------
 # Purpose:
-#   End-to-end validation for the Azure Service Bus KeyGen microservice.
-#   - Discovers the deployed Azure Function App endpoint via Azure CLI.
-#   - Submits a key generation request to the HTTP-triggered Function endpoint.
-#   - Parses the returned request_id.
-#   - Polls the result endpoint until the generated SSH keypair is available.
+#   - Discover Azure Function App endpoint via Azure CLI.
+#   - Retrieve static website URL from Terraform output.
+#   - Submit keygen request and validate async processing.
+#   - Print quick-start endpoints for testing.
+#
+# Fast-Fail Behavior:
+#   - Script exits immediately on command failure, unset variables,
+#     or failed pipelines.
 #
 # Requirements:
-#   - curl, jq, and Azure CLI installed and authenticated.
-#   - Terraform deployment of the Azure Function App completed successfully.
-#   - Resource group name matches the deployment (default used here: sb-keygen-rg).
-#   - Optional env vars:
-#       KEY_TYPE = rsa | ed25519            (default: rsa)
-#       KEY_BITS = 2048 | 4096 (RSA only)   (default: 2048)
-#
-# Notes:
-#   - This script assumes your Function App exposes:
-#       POST /api/keygen
-#       GET  /api/result/{request_id}
-#   - If your Function App requires a function key, you must include it (x-functions-key
-#     header or ?code= query string), and your CORS settings must allow your caller.
-# ================================================================================================
+#   - curl, jq, Terraform, and Azure CLI installed and authenticated.
+#   - Terraform deployment completed successfully.
+# ==============================================================================
 set -euo pipefail
 
+# ------------------------------------------------------------------------------
+# Configuration
+# ------------------------------------------------------------------------------
+RESOURCE_GROUP="${RESOURCE_GROUP:-sb-keygen-rg}"
+
+# ------------------------------------------------------------------------------
+# Step 0: Retrieve static website URL from Terraform
+# ------------------------------------------------------------------------------
 cd ./03-webapp || exit 1
-INDEX_PAGE_URL="$(terraform output -raw index_page_url)"
+website_url="$(terraform output -raw index_page_url)"
 cd ..
-echo "NOTE: Webapp index page URL: ${INDEX_PAGE_URL}"
 
-# -----------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 # Step 1: Discover Azure Function App endpoint
-# -----------------------------------------------------------------------------------------------
-echo "NOTE: Retrieving Azure Function App API endpoint..."
+# ------------------------------------------------------------------------------
+echo "NOTE: Locating Azure Function App endpoint..."
 
-# Discover the Function App name created by Terraform
-FunctionAppName=$(az functionapp list \
-  --resource-group sb-keygen-rg \
-  --query "[?starts_with(name, 'func-keygen-')].name" \
-  --output tsv)
+function_app_name="$(az functionapp list \
+  --resource-group "${RESOURCE_GROUP}" \
+  --query "[?starts_with(name, 'func-keygen-')].name | [0]" \
+  --output tsv)"
 
-URL="https://$(az functionapp show \
-  --name "$FunctionAppName" \
-  --resource-group sb-keygen-rg \
-  --query "defaultHostName" \
-  -o tsv)/api"
-
-export API_BASE="${URL}"
-echo "NOTE: Function App endpoint : ${API_BASE}"
-
-# -----------------------------------------------------------------------------------------------
-# Step 2: Submit SSH key generation request
-# -----------------------------------------------------------------------------------------------
-KEY_TYPE="${KEY_TYPE:-rsa}"
-KEY_BITS="${KEY_BITS:-2048}"
-
-REQ_PAYLOAD=$(jq -n --arg kt "$KEY_TYPE" --arg kb "$KEY_BITS" \
-  '{ key_type: $kt, key_bits: ($kb | tonumber) }')
-
-echo "NOTE: Sending request - key_type=${KEY_TYPE}, key_bits=${KEY_BITS}"
-RESPONSE=$(curl -s -X POST "${API_BASE}/keygen" \
-  -H "Content-Type: application/json" \
-  -d "$REQ_PAYLOAD")
-
-REQUEST_ID=$(echo "$RESPONSE" | jq -r '.request_id // empty')
-
-if [[ -z "$REQUEST_ID" ]]; then
-  echo "ERROR: No request_id returned."
-  echo "NOTE: Response was: $RESPONSE"
+if [[ -z "${function_app_name}" || "${function_app_name}" == "None" ]]; then
+  echo "ERROR: No Function App found with prefix 'func-keygen-' in RG '${RESOURCE_GROUP}'"
   exit 1
 fi
 
-echo "NOTE: Submitted keygen request (${REQUEST_ID})."
+default_host_name="$(az functionapp show \
+  --name "${function_app_name}" \
+  --resource-group "${RESOURCE_GROUP}" \
+  --query "defaultHostName" \
+  --output tsv)"
+
+if [[ -z "${default_host_name}" || "${default_host_name}" == "None" ]]; then
+  echo "ERROR: Unable to determine Function App hostname."
+  exit 1
+fi
+
+api_url="https://${default_host_name}/api"
+echo "NOTE: Function App URL - ${api_url}"
+
+# ------------------------------------------------------------------------------
+# Step 2: Submit SSH key generation request
+# ------------------------------------------------------------------------------
+KEY_TYPE="${KEY_TYPE:-rsa}"
+KEY_BITS="${KEY_BITS:-2048}"
+
+req_payload="$(
+  jq -n \
+    --arg kt "${KEY_TYPE}" \
+    --arg kb "${KEY_BITS}" \
+    '{ key_type: $kt, key_bits: ($kb | tonumber) }'
+)"
+
+echo "NOTE: Sending request - key_type=${KEY_TYPE}, key_bits=${KEY_BITS}"
+
+response="$(
+  curl -s -X POST "${api_url}/keygen" \
+    -H "Content-Type: application/json" \
+    -d "${req_payload}"
+)"
+
+request_id="$(echo "${response}" | jq -r '.request_id // empty')"
+
+if [[ -z "${request_id}" ]]; then
+  echo "ERROR: No request_id returned."
+  echo "NOTE: Response was: ${response}"
+  exit 1
+fi
+
+echo "NOTE: Submitted keygen request (${request_id})."
 echo "NOTE: Polling for result..."
 
-# -----------------------------------------------------------------------------------------------
-# Step 3: Poll result endpoint until response available
-# -----------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
+# Step 3: Poll result endpoint until complete
+# ------------------------------------------------------------------------------
 MAX_ATTEMPTS=30
 SLEEP_SECONDS=2
 
 for ((i=1; i<=MAX_ATTEMPTS; i++)); do
-  RESULT=$(curl -s "${API_BASE}/result/${REQUEST_ID}")
-  STATUS=$(echo "$RESULT" | jq -r '.status // empty')
+  result="$(curl -s "${api_url}/result/${request_id}")"
+  status="$(echo "${result}" | jq -r '.status // empty')"
 
-  if [[ "$STATUS" == "complete" ]]; then
+  if [[ "${status}" == "complete" ]]; then
     echo "NOTE: Key generation complete."
-    #echo "$RESULT" | jq
-    exit 0
+    break
   fi
 
-  if [[ "$STATUS" == "error" ]]; then
+  if [[ "${status}" == "error" ]]; then
     echo "ERROR: Service reported an error."
-    echo "$RESULT" | jq
+    echo "${result}" | jq
     exit 1
   fi
 
-  echo "WARNING: Attempt ${i}/${MAX_ATTEMPTS}: pending..."
-  sleep "$SLEEP_SECONDS"
+  echo "NOTE: Attempt ${i}/${MAX_ATTEMPTS}: pending..."
+  sleep "${SLEEP_SECONDS}"
+
+  if [[ "${i}" -eq "${MAX_ATTEMPTS}" ]]; then
+    echo "ERROR: Key generation did not complete."
+    exit 1
+  fi
 done
 
-echo "ERROR: Key generation did not complete after ${MAX_ATTEMPTS} attempts."
-exit 1
+# ------------------------------------------------------------------------------
+# Final Quick Start Output
+# ------------------------------------------------------------------------------
+echo ""
+echo "============================================================================"
+echo "KeyGen Quick Start - Validation Output"
+echo "============================================================================"
+echo ""
+
+if [ -n "${website_url}" ] && [ "${website_url}" != "None" ]; then
+  echo "NOTE: Test Web URL:    ${website_url}"
+else
+  echo "WARN: Static website URL not found"
+fi
+
+if [ -n "${api_url}" ] && [ "${api_url}" != "None" ]; then
+  echo "NOTE: API Base URI:    ${api_url}"
+else
+  echo "WARN: Function App endpoint not found"
+fi
+
+echo ""
+echo "NOTE: Validation complete."
+echo ""
