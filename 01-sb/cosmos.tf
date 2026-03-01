@@ -1,6 +1,6 @@
-# ================================================================================================
+# =============================================================================
 # Azure Cosmos DB (SQL API): KeyGen Results Store
-# ================================================================================================
+# =============================================================================
 # Creates:
 #   - Cosmos DB account (SQL / Core API)
 #   - SQL database: keygen
@@ -8,19 +8,19 @@
 #
 # Characteristics:
 #   - Partition key: /request_id
-#   - TTL enabled (container-level) to mirror DynamoDB TTL behavior
+#   - Container TTL enabled (mirrors DynamoDB TTL behavior)
 #
 # Uses existing:
 #   - azurerm provider configuration
 #   - azurerm_resource_group.project_rg
 #
 # Naming:
-#   cosmos-keygen-<6-char-random>
-# ================================================================================================
+#   - cosmos-keygen-<6-char-random>
+# =============================================================================
 
-# ------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Random suffix for globally-unique Cosmos DB account name
-# ------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 resource "random_string" "cosmos_suffix" {
   length  = 6
   upper   = false
@@ -29,16 +29,16 @@ resource "random_string" "cosmos_suffix" {
   special = false
 }
 
-# ------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Locals
-# ------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 locals {
   cosmos_account_name = "cosmos-keygen-${random_string.cosmos_suffix.result}"
 }
 
-# ------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Cosmos DB Account (SQL / Core API)
-# ------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 resource "azurerm_cosmosdb_account" "keygen" {
   name                = local.cosmos_account_name
   location            = azurerm_resource_group.project_rg.location
@@ -65,33 +65,36 @@ resource "azurerm_cosmosdb_account" "keygen" {
   }
 }
 
-# ------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # SQL Database
-# ------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 resource "azurerm_cosmosdb_sql_database" "keygen" {
   name                = "keygen"
   resource_group_name = azurerm_resource_group.project_rg.name
   account_name        = azurerm_cosmosdb_account.keygen.name
 }
 
+# -----------------------------------------------------------------------------
+# SQL Container: results
+# -----------------------------------------------------------------------------
 resource "azurerm_cosmosdb_sql_container" "results" {
   name                = "results"
   resource_group_name = azurerm_resource_group.project_rg.name
   account_name        = azurerm_cosmosdb_account.keygen.name
   database_name       = azurerm_cosmosdb_sql_database.keygen.name
 
-  # ----------------------------------------------------------------------------------------------
-  # Partitioning (newer azurerm provider expects a LIST)
-  # ----------------------------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
+  # Partitioning (provider expects a list)
+  # ---------------------------------------------------------------------------
   partition_key_paths   = ["/request_id"]
   partition_key_kind    = "Hash"
   partition_key_version = 2
 
-  # ----------------------------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
   # TTL (seconds)
   #   - -1  = disabled
-  #   - > 0 = automatic deletion after N seconds
-  # ----------------------------------------------------------------------------------------------
+  #   - > 0 = delete items after N seconds
+  # ---------------------------------------------------------------------------
   default_ttl = 3600 # 1 hour
 
   indexing_policy {
@@ -106,10 +109,9 @@ resource "azurerm_cosmosdb_sql_container" "results" {
     }
   }
 
-
-  # ----------------------------------------------------------------------------------------------
-  # Lifecycle: Ignore provider/Azure-managed indexing policy normalization
-  # ----------------------------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
+  # Lifecycle: Ignore provider/Azure indexing policy normalization
+  # ---------------------------------------------------------------------------
   lifecycle {
     ignore_changes = [
       indexing_policy
@@ -117,10 +119,13 @@ resource "azurerm_cosmosdb_sql_container" "results" {
   }
 }
 
-# ================================================================================================
+# =============================================================================
 # Cosmos DB SQL RBAC: Custom Role for KeyGen Function
-# ================================================================================================
+# =============================================================================
 
+# -----------------------------------------------------------------------------
+# Custom role definition (least-privilege data actions)
+# -----------------------------------------------------------------------------
 resource "azurerm_cosmosdb_sql_role_definition" "keygen_cosmos_role" {
   name                = "KeygenCosmosRole"
   resource_group_name = azurerm_resource_group.project_rg.name
@@ -138,16 +143,19 @@ resource "azurerm_cosmosdb_sql_role_definition" "keygen_cosmos_role" {
   }
 }
 
+# -----------------------------------------------------------------------------
+# Role assignment for Function App managed identity (Flex Consumption)
+# -----------------------------------------------------------------------------
 resource "azurerm_cosmosdb_sql_role_assignment" "keygen_cosmos_role_assignment" {
   name = uuidv5(
     "dns",
-    "${azurerm_cosmosdb_account.keygen.id}:${azurerm_linux_function_app.keygen_func.identity[0].principal_id}:${azurerm_cosmosdb_sql_role_definition.keygen_cosmos_role.id}"
+    "${azurerm_cosmosdb_account.keygen.id}:${azurerm_function_app_flex_consumption.keygen_func.identity[0].principal_id}:${azurerm_cosmosdb_sql_role_definition.keygen_cosmos_role.id}"
   )
 
   resource_group_name = azurerm_resource_group.project_rg.name
   account_name        = azurerm_cosmosdb_account.keygen.name
 
-  principal_id       = azurerm_linux_function_app.keygen_func.identity[0].principal_id
+  principal_id       = azurerm_function_app_flex_consumption.keygen_func.identity[0].principal_id
   role_definition_id = azurerm_cosmosdb_sql_role_definition.keygen_cosmos_role.id
   scope              = azurerm_cosmosdb_account.keygen.id
 }
