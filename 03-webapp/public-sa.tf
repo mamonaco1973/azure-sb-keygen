@@ -78,6 +78,24 @@ resource "azurerm_storage_blob" "index" {
 }
 
 # ------------------------------------------------------------------------------------------------
+# Upload favicon.ico (from current directory)
+# ------------------------------------------------------------------------------------------------
+resource "azurerm_storage_blob" "favicon" {
+  name                   = "favicon.ico"
+  storage_account_name   = azurerm_storage_account.static_site.name
+  storage_container_name = "$web"
+  type                   = "Block"
+
+  source       = "${path.root}/favicon.ico"
+  content_type = "image/x-icon"
+
+  depends_on = [
+    azurerm_storage_account_static_website.static
+  ]
+}
+
+
+# ------------------------------------------------------------------------------------------------
 # Outputs
 # ------------------------------------------------------------------------------------------------
 
