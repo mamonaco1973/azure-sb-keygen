@@ -16,6 +16,7 @@
 #   - curl, jq, Terraform, and Azure CLI installed and authenticated.
 #   - Terraform deployment completed successfully.
 # ==============================================================================
+
 set -euo pipefail
 
 # ------------------------------------------------------------------------------
@@ -41,23 +42,34 @@ function_app_name="$(az functionapp list \
   --output tsv)"
 
 if [[ -z "${function_app_name}" || "${function_app_name}" == "None" ]]; then
-  echo "ERROR: No Function App found with prefix 'func-keygen-' in RG '${RESOURCE_GROUP}'"
+  echo "ERROR: No Function App found with prefix 'func-keygen-' in RG:"
+  echo "ERROR:   ${RESOURCE_GROUP}"
   exit 1
 fi
 
 default_host_name="$(az functionapp show \
   --name "${function_app_name}" \
   --resource-group "${RESOURCE_GROUP}" \
-  --query "defaultHostName" \
+  --query "properties.defaultHostName" \
   --output tsv)"
 
 if [[ -z "${default_host_name}" || "${default_host_name}" == "None" ]]; then
+  default_host_name="$(az functionapp show \
+    --name "${function_app_name}" \
+    --resource-group "${RESOURCE_GROUP}" \
+    --query "properties.hostNames[0]" \
+    --output tsv)"
+fi
+
+if [[ -z "${default_host_name}" || "${default_host_name}" == "None" ]]; then
   echo "ERROR: Unable to determine Function App hostname."
+  echo "ERROR: Function App name: ${function_app_name}"
   exit 1
 fi
 
 api_url="https://${default_host_name}/api"
-echo "NOTE: Function App URL - ${api_url}"
+echo "NOTE: Function App Name - ${function_app_name}"
+echo "NOTE: Function App URL  - ${api_url}"
 
 # ------------------------------------------------------------------------------
 # Step 2: Submit SSH key generation request
@@ -75,7 +87,7 @@ req_payload="$(
 echo "NOTE: Sending request - key_type=${KEY_TYPE}, key_bits=${KEY_BITS}"
 
 response="$(
-  curl -s -X POST "${api_url}/keygen" \
+  curl -sS -X POST "${api_url}/keygen" \
     -H "Content-Type: application/json" \
     -d "${req_payload}"
 )"
@@ -98,7 +110,7 @@ MAX_ATTEMPTS=30
 SLEEP_SECONDS=2
 
 for ((i=1; i<=MAX_ATTEMPTS; i++)); do
-  result="$(curl -s "${api_url}/result/${request_id}")"
+  result="$(curl -sS "${api_url}/result/${request_id}")"
   status="$(echo "${result}" | jq -r '.status // empty')"
 
   if [[ "${status}" == "complete" ]]; then
@@ -130,13 +142,13 @@ echo "Azure Service Bus Quick Start - Validation Output"
 echo "============================================================================"
 echo ""
 
-if [ -n "${website_url}" ] && [ "${website_url}" != "None" ]; then
+if [[ -n "${website_url}" && "${website_url}" != "None" ]]; then
   echo "NOTE: Test Web URL:    ${website_url}"
 else
   echo "WARN: Static website URL not found"
 fi
 
-if [ -n "${api_url}" ] && [ "${api_url}" != "None" ]; then
+if [[ -n "${api_url}" && "${api_url}" != "None" ]]; then
   echo "NOTE: API Base URI:    ${api_url}"
 else
   echo "WARN: Function App endpoint not found"
