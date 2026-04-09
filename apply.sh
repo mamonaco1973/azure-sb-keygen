@@ -83,8 +83,14 @@ FunctionAppName=$(az functionapp list \
   --query "[?starts_with(name, 'func-keygen-')].name" \
   --output tsv)
 
-# Deploy via az webapp deploy (az functionapp deploy has a known 415 bug on FC1)
-az webapp deploy \
+# FC1 rejects deployments when SCM_DO_BUILD_DURING_DEPLOYMENT=true is set.
+# Azure injects this automatically — remove it before deploying.
+az functionapp config appsettings delete \
+  --name "$FunctionAppName" \
+  --resource-group sb-keygen-rg \
+  --setting-names SCM_DO_BUILD_DURING_DEPLOYMENT
+
+az functionapp deploy \
   --name "$FunctionAppName" \
   --resource-group sb-keygen-rg \
   --src-path app.zip \
