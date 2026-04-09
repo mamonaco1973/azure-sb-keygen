@@ -74,6 +74,7 @@ zip -r app.zip . \
   -x "venv/*" \
   -x ".venv/*" \
   -x "*.DS_Store" \
+  -x "*.vscode*" \
   -x "local.settings.json"
 
 # Discover the Function App name created by Terraform
@@ -82,12 +83,19 @@ FunctionAppName=$(az functionapp list \
   --query "[?starts_with(name, 'func-keygen-')].name" \
   --output tsv)
 
-# Publish the Functions code using ZIP deployment
-az functionapp deploy \
-  --name "$FunctionAppName" \
-  --resource-group sb-keygen-rg \
-  --src-path app.zip \
-  --type zip
+# Publish the Functions code via ARM onedeploy API (az functionapp deploy has a
+# known 415 content-type bug on Flex Consumption; curl with octet-stream works)
+SUBSCRIPTION=$(az account show --query id -o tsv)
+TOKEN=$(az account get-access-token --query accessToken -o tsv)
+
+curl -s -X PUT \
+  "https://management.azure.com/subscriptions/${SUBSCRIPTION}/resourceGroups/sb-keygen-rg/providers/Microsoft.Web/sites/${FunctionAppName}/extensions/onedeploy?api-version=2022-03-01&type=zip&restart=true" \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -H "Content-Type: application/octet-stream" \
+  --data-binary @app.zip
+
+echo "NOTE: Waiting for deployment to complete..."
+sleep 30
 
 cd ..
 
