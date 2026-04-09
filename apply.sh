@@ -74,7 +74,6 @@ zip -r app.zip . \
   -x "venv/*" \
   -x ".venv/*" \
   -x "*.DS_Store" \
-  -x "*.vscode*" \
   -x "local.settings.json"
 
 # Discover the Function App name created by Terraform
@@ -83,21 +82,11 @@ FunctionAppName=$(az functionapp list \
   --query "[?starts_with(name, 'func-keygen-')].name" \
   --output tsv)
 
-# FC1 rejects deployments when SCM_DO_BUILD_DURING_DEPLOYMENT=true is set.
-# Azure injects this automatically — remove it before deploying.
-az functionapp config appsettings delete \
+az functionapp deployment source config-zip \
   --name "$FunctionAppName" \
   --resource-group sb-keygen-rg \
-  --setting-names SCM_DO_BUILD_DURING_DEPLOYMENT
-
-az functionapp deploy \
-  --name "$FunctionAppName" \
-  --resource-group sb-keygen-rg \
-  --src-path app.zip \
-  --type zip
-
-echo "NOTE: Waiting for deployment to settle..."
-sleep 15
+  --src app.zip \
+  --build-remote true
 
 cd ..
 
