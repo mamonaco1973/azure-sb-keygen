@@ -83,11 +83,11 @@ FunctionAppName=$(az functionapp list \
   --output tsv)
 
 # Publish the Functions code using ZIP deployment
-az functionapp deployment source config-zip \
+az functionapp deploy \
   --name "$FunctionAppName" \
   --resource-group sb-keygen-rg \
-  --src app.zip \
-  --build-remote true
+  --src-path app.zip \
+  --type zip
 
 cd ..
 

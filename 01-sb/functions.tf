@@ -177,6 +177,8 @@ resource "azurerm_function_app_flex_consumption" "keygen_func" {
     ignore_changes = [
       app_settings["APPLICATIONINSIGHTS_CONNECTION_STRING"],
       app_settings["FUNCTIONS_EXTENSION_VERSION"],
+      app_settings["SCM_DO_BUILD_DURING_DEPLOYMENT"],
+      site_config,
     ]
   }
 }
